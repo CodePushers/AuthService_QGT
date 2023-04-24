@@ -4,6 +4,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Security.Claims;
+using MongoDB.Driver;
+using MongoDB.Bson;
 
 namespace AuthServiceAPI.Controllers;
 
@@ -14,13 +16,25 @@ public class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly string _secret;
     private readonly string _issuer;
-
-
+    private readonly IMongoCollection<User> _users;
+    private readonly IConfiguration _config;
+    
     public AuthController(ILogger<AuthController> logger, IConfiguration config)
     {
         _logger = logger;
         _secret = config["Secret"] ?? "Secret missing";
         _issuer = config["Issuer"] ?? "Issuer missing";
+        _config = config;
+        
+        var mongoClient = new MongoClient(_config["ConnectionURI"]);
+        _logger.LogInformation($"ConnectionURI: {_config["ConnectionURI"]}");
+
+        var database = mongoClient.GetDatabase(_config["DatabaseName"]);
+        _logger.LogInformation($"Database: {_config["DatabaseName"]}");
+
+        _users = database.GetCollection<User>(_config["CollectionName"]);
+        _logger.LogInformation($"Collection: {_config["CollectionName"]}");
+
     }
 
     // Login POST - Godkender legitimationsoplysninger og udsteder JWT-token
@@ -28,11 +42,17 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginModel login)
     {
-        if (login.Password != "password")
+        _logger.LogInformation($"Login: {login.Username} - {login.Password}");
+        var user = await _users.Find(u => u.Username == login.Username).FirstOrDefaultAsync<User>();
+
+        _logger.LogInformation($"{user.Username}, {user.Password}");
+
+        if (user == null || user.Username != login.Username)
         {
             return Unauthorized();
         }
-        var token = GenerateJwtToken(login.Username);
+        var token = GenerateJwtToken(user.Username);
+
         return Ok(new { token });
     }
 
