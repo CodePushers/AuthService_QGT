@@ -22,18 +22,22 @@ public class AuthController : ControllerBase
     public AuthController(ILogger<AuthController> logger, IConfiguration config)
     {
         _logger = logger;
-        _secret = config["Secret"] ?? "Secret missing";
-        _issuer = config["Issuer"] ?? "Issuer missing";
         _config = config;
+
+        _secret = config["Secret"] ?? "Secret missing";
+        _issuer = config["Issuer"] ?? "Issue'er missing";
         
+        // Client
         var mongoClient = new MongoClient(_config["ConnectionURI"]);
-        _logger.LogInformation($"ConnectionURI: {_config["ConnectionURI"]}");
+        _logger.LogInformation($"[*] CONNECTION_URI: {_config["ConnectionURI"]}");
 
+        // Database
         var database = mongoClient.GetDatabase(_config["DatabaseName"]);
-        _logger.LogInformation($"Database: {_config["DatabaseName"]}");
+        _logger.LogInformation($"[*] DATABASE: {_config["DatabaseName"]}");
 
+        // Collection
         _users = database.GetCollection<User>(_config["CollectionName"]);
-        _logger.LogInformation($"Collection: {_config["CollectionName"]}");
+        _logger.LogInformation($"[*] COLLECTION: {_config["CollectionName"]}");
 
     }
 
@@ -42,55 +46,22 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginModel login)
     {
-        _logger.LogInformation($"Login: {login.Username} - {login.Password}");
-        var user = await _users.Find(u => u.Username == login.Username).FirstOrDefaultAsync<User>();
+        _logger.LogInformation("Metoden: Login(LoginModel login) kaldt klokken: {DT}", DateTime.UtcNow.ToLongTimeString());
 
-        _logger.LogInformation($"{user.Username}, {user.Password}");
+        User user = await _users.Find(u => u.Username == login.Username).FirstOrDefaultAsync<User>();
+        _logger.LogInformation($"Loginoplysninger\n\tUsername: {user.Username}\n\tPassword: {user.Password}");
 
         if (user == null || user.Username != login.Username)
         {
             return Unauthorized();
         }
+
         var token = GenerateJwtToken(user.Username);
 
         return Ok(new { token });
     }
 
-    [AllowAnonymous]
-    [HttpPost("validate")]
-    public async Task<IActionResult> ValidateJwtToken([FromBody] string? token)
-    {
-        _logger.LogInformation($"Token: {token}");
-
-        if (token.IsNullOrEmpty())
-            return BadRequest("Invalid token submited.");
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(_secret);
-
-        try
-        {
-            tokenHandler.ValidateToken(token, new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = false,
-                ValidateAudience = false,
-                ClockSkew = TimeSpan.Zero
-            }, out SecurityToken validatedToken);
-
-            var jwtToken = (JwtSecurityToken)validatedToken;
-
-            var accountId = jwtToken.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value;
-            
-            return Ok(accountId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, ex.Message);
-            return StatusCode(404);
-        }
-    }
+    // Genererer en JWT-token når en kendt bruger logger på.
     private string GenerateJwtToken(string username)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
