@@ -102,12 +102,6 @@ public class AuthController : ControllerBase
            new Claim(ClaimTypes.NameIdentifier, username),
         };
 
-        if (username == "admin")
-        {
-            claims.Add(new Claim(ClaimTypes.Role, "admin"));
-            claims.Add(new Claim("admin", "true"));
-        }
-
         var token = new JwtSecurityToken(
             _issuer,
             "http://localhost",

@@ -20,11 +20,4 @@ public class UserAuthController : ControllerBase
     {
         return Ok("You're authorized");
     }
-
-    [Authorize(Policy = "Admin")]
-    [HttpGet("admin")]
-    public async Task<IActionResult> Get2()
-    {
-        return Ok("You're authorized admin");
-    }
 }
