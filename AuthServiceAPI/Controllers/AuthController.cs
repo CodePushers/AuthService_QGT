@@ -26,19 +26,28 @@ public class AuthController : ControllerBase
 
         _secret = config["Secret"] ?? "Secret missing";
         _issuer = config["Issuer"] ?? "Issue'er missing";
-        
-        // Client
-        var mongoClient = new MongoClient(_config["ConnectionURI"]);
-        _logger.LogInformation($"[*] CONNECTION_URI: {_config["ConnectionURI"]}");
 
-        // Database
-        var database = mongoClient.GetDatabase(_config["DatabaseName"]);
-        _logger.LogInformation($"[*] DATABASE: {_config["DatabaseName"]}");
+        try
+        {
+            // Client
+            var mongoClient = new MongoClient(_config["ConnectionURI"]);
+            _logger.LogInformation($"[*] CONNECTION_URI: {_config["ConnectionURI"]}");
 
-        // Collection
-        _users = database.GetCollection<User>(_config["CollectionName"]);
-        _logger.LogInformation($"[*] COLLECTION: {_config["CollectionName"]}");
+            // Database
+            var database = mongoClient.GetDatabase(_config["DatabaseName"]);
+            _logger.LogInformation($"[*] DATABASE: {_config["DatabaseName"]}");
 
+            // Collection
+            _users = database.GetCollection<User>(_config["CollectionName"]);
+            _logger.LogInformation($"[*] COLLECTION: {_config["CollectionName"]}");
+
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Fejl ved oprettelse af forbindelse: {ex.Message}");
+            throw;
+        }
+       
     }
 
     // Login POST - Godkender legitimationsoplysninger og udsteder JWT-token
@@ -46,19 +55,28 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginModel login)
     {
-        _logger.LogInformation("Metoden: Login(LoginModel login) kaldt klokken: {DT}", DateTime.UtcNow.ToLongTimeString());
-
-        User user = await _users.Find(u => u.Username == login.Username).FirstOrDefaultAsync<User>();
-        _logger.LogInformation($"Loginoplysninger\n\tUsername: {user.Username}\n\tPassword: {user.Password}");
-
-        if (user == null || user.Username != login.Username)
+        try
         {
-            return Unauthorized();
+            _logger.LogInformation("Metoden: Login(LoginModel login) kaldt klokken: {DT}", DateTime.UtcNow.ToLongTimeString());
+
+            User user = await _users.Find(u => u.Username == login.Username).FirstOrDefaultAsync<User>();
+            _logger.LogInformation($"Loginoplysninger\n\tUsername: {user.Username}\n\tPassword: {user.Password}");
+
+            if (user == null || user.Username != login.Username)
+            {
+                return Unauthorized();
+            }
+
+            var token = GenerateJwtToken(user.Username);
+
+            return Ok(new { token });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Fejl ved login metode: {ex.Message}");
+            throw;
         }
 
-        var token = GenerateJwtToken(user.Username);
-
-        return Ok(new { token });
     }
 
     // Genererer en JWT-token når en kendt bruger logger på.
