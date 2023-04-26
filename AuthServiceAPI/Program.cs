@@ -6,15 +6,10 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-IConfiguration config = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .Build();
+string mySecret = Environment.GetEnvironmentVariable("Secret") ?? "none";
+string myIssuer = Environment.GetEnvironmentVariable("Issuer") ?? "none";
 
-string mySecret = config["Secret"] ?? "none";
-string myIssuer = config["Issuer"] ?? "none";
-string myTest = config["Test"] ?? "none";
-
-Console.WriteLine($"MySecret: {mySecret}, MyIssuer: {myIssuer}, NyTest: {myTest}");
+Console.WriteLine($"MySecret: {mySecret}, MyIssuer: {myIssuer}");
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
